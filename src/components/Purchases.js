@@ -2,180 +2,260 @@ import React, { useState, useEffect } from "react";
 import CommonModal from "./CommonModal";
 
 export default function PurchaseList() {
-  const [purchases, setPurchases] = useState([]);
+  const [list, setList] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    invoice_no: "",
+  const [products, setProducts] = useState([]);
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [supplierName, setSupplierName] = useState("");
+  const [cart, setCart] = useState([]); // multiple products in one purchase
+  const [productForm, setProductForm] = useState({
     product_id: "",
     quantity: "",
     cost_price: "",
-    supplier_name: "",
   });
-  const [products, setProducts] = useState([]);
 
   useEffect(() => {
     loadPurchases();
     loadProducts();
   }, []);
 
-  // Mock data — replace with API calls
-  function loadPurchases() {
-    setPurchases([
+  // Mock data - replace with API later
+  async function loadPurchases() {
+    const data = [
       {
         invoice_no: "INV001",
-        product_name: "Keyboard",
-        quantity: 5,
-        cost_price: 400,
-        total_cost: 2000,
         supplier_name: "ABC Suppliers",
         purchase_date: "2025-10-10",
+        products: [
+          { product_name: "Keyboard", quantity: 10, cost_price: 400, total_cost: 4000 },
+          { product_name: "Mouse", quantity: 20, cost_price: 200, total_cost: 4000 },
+        ],
       },
-    ]);
+    ];
+    setList(data);
   }
 
-  function loadProducts() {
-    setProducts([
+  async function loadProducts() {
+    const data = [
       { id: 1, product_name: "Keyboard", quantity: 50 },
       { id: 2, product_name: "Mouse", quantity: 100 },
-    ]);
+      { id: 3, product_name: "Monitor", quantity: 20 },
+    ];
+    setProducts(data);
   }
 
-  function handleChange(e) {
+  function changeProductForm(e) {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setProductForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSave() {
-    if (!form.invoice_no || !form.product_id || !form.quantity || !form.cost_price) {
-      alert("Please fill all fields");
+  function addProductToCart() {
+    if (!productForm.product_id || !productForm.quantity || !productForm.cost_price) {
+      alert("Please fill all product fields");
       return;
     }
 
-    const product = products.find((p) => p.id === parseInt(form.product_id));
-    const totalCost = parseFloat(form.quantity) * parseFloat(form.cost_price);
+    const selectedProduct = products.find(
+      (p) => p.id === parseInt(productForm.product_id)
+    );
 
-    const newPurchase = {
-      ...form,
-      product_name: product?.product_name || "",
+    const totalCost =
+      parseFloat(productForm.quantity) * parseFloat(productForm.cost_price);
+
+    const newItem = {
+      product_id: productForm.product_id,
+      product_name: selectedProduct?.product_name || "Unknown",
+      quantity: parseInt(productForm.quantity),
+      cost_price: parseFloat(productForm.cost_price),
       total_cost: totalCost,
-      purchase_date: new Date().toISOString().split("T")[0],
     };
 
-    setPurchases((prev) => [...prev, newPurchase]);
-    setForm({
-      invoice_no: "",
-      product_id: "",
-      quantity: "",
-      cost_price: "",
-      supplier_name: "",
-    });
+    setCart((prev) => [...prev, newItem]);
+    setProductForm({ product_id: "", quantity: "", cost_price: "" });
+  }
+
+  function removeFromCart(index) {
+    setCart((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function savePurchase() {
+    if (!invoiceNo || !supplierName || cart.length === 0) {
+      alert("Please fill invoice details and add at least one product");
+      return;
+    }
+
+    const newPurchase = {
+      invoice_no: invoiceNo,
+      supplier_name: supplierName,
+      purchase_date: new Date().toISOString().split("T")[0],
+      products: cart,
+    };
+
+    setList((prev) => [...prev, newPurchase]);
+    setInvoiceNo("");
+    setSupplierName("");
+    setCart([]);
     setOpen(false);
   }
 
+  const invoiceTotal = cart.reduce((sum, item) => sum + item.total_cost, 0);
+
   return (
-    <div style={styles.purchaseContainer}>
-      <div style={styles.topActions}>
-        <button style={styles.btn} onClick={() => setOpen(true)}>
-          + Add Purchase
+    <div>
+      <div className="card top-actions">
+        <button className="btn" onClick={() => setOpen(true)}>
+          + Add Wholesale Purchase
         </button>
       </div>
 
-      <div style={styles.card}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Invoice</th>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Cost</th>
-                <th>Total</th>
-                <th>Supplier</th>
-                <th>Date</th>
+      <div className="card">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Invoice No</th>
+              <th>Supplier</th>
+              <th>Products</th>
+              <th>Total Cost</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((purchase, idx) => (
+              <tr key={idx}>
+                <td>{idx + 1}</td>
+                <td>{purchase.invoice_no}</td>
+                <td>{purchase.supplier_name}</td>
+                <td>
+                  {purchase.products.map((p, i) => (
+                    <div key={i}>
+                      {p.product_name} — {p.quantity} pcs × ₹{p.cost_price} = ₹
+                      {p.total_cost}
+                    </div>
+                  ))}
+                </td>
+                <td>
+                  ₹
+                  {purchase.products
+                    .reduce((sum, p) => sum + p.total_cost, 0)
+                    .toFixed(2)}
+                </td>
+                <td>{purchase.purchase_date}</td>
               </tr>
-            </thead>
-            <tbody>
-              {purchases.length > 0 ? (
-                purchases.map((item, i) => (
-                  <tr key={i}>
-                    <td>{i + 1}</td>
-                    <td>{item.invoice_no}</td>
-                    <td>{item.product_name}</td>
-                    <td>{item.quantity}</td>
-                    <td>{item.cost_price}</td>
-                    <td>{item.total_cost}</td>
-                    <td>{item.supplier_name}</td>
-                    <td>{item.purchase_date}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} style={styles.noData}>
-                    No purchases found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+            ))}
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={6}>No purchases yet</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Modal Form */}
-      <CommonModal open={open} onClose={() => setOpen(false)} title="Add Purchase">
-        <div style={styles.modalForm}>
-          <div style={styles.formRow}>
+      {/* Modal */}
+      <CommonModal open={open} onClose={() => setOpen(false)} title="Wholesale Purchase">
+        <div>
+          <div className="form-row">
             <input
-              style={styles.input}
-              name="invoice_no"
-              placeholder="Invoice Number"
-              value={form.invoice_no}
-              onChange={handleChange}
+              className="input"
+              placeholder="Invoice No"
+              value={invoiceNo}
+              onChange={(e) => setInvoiceNo(e.target.value)}
             />
+            <input
+              className="input"
+              placeholder="Supplier Name"
+              value={supplierName}
+              onChange={(e) => setSupplierName(e.target.value)}
+            />
+          </div>
+
+          <h4>Add Products to this Invoice</h4>
+          <div className="form-row">
             <select
-              style={styles.input}
+              className="input"
               name="product_id"
-              value={form.product_id}
-              onChange={handleChange}
+              value={productForm.product_id}
+              onChange={changeProductForm}
             >
-              <option value="">Select Product</option>
+              <option value="">-- Select Product --</option>
               {products.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.product_name} (Stock: {p.quantity})
                 </option>
               ))}
             </select>
-          </div>
-
-          <div style={styles.formRow}>
             <input
-              style={styles.input}
+              className="input"
+              type="number"
               name="quantity"
-              type="number"
-              placeholder="Quantity"
-              value={form.quantity}
-              onChange={handleChange}
+              placeholder="Qty"
+              value={productForm.quantity}
+              onChange={changeProductForm}
             />
             <input
-              style={styles.input}
+              className="input"
+              type="number"
               name="cost_price"
-              type="number"
               placeholder="Cost Price"
-              value={form.cost_price}
-              onChange={handleChange}
+              value={productForm.cost_price}
+              onChange={changeProductForm}
             />
-            <input
-              style={styles.input}
-              name="supplier_name"
-              placeholder="Supplier Name"
-              value={form.supplier_name}
-              onChange={handleChange}
-            />
+            <button className="btn" onClick={addProductToCart}>
+              + Add
+            </button>
           </div>
 
-          <div style={styles.formFooter}>
-            <button style={styles.btn} onClick={handleSave}>
-              Save
+          {cart.length > 0 && (
+            <table className="table" style={{ marginTop: "1rem" }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Product</th>
+                  <th>Qty</th>
+                  <th>Cost</th>
+                  <th>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.map((p, idx) => (
+                  <tr key={idx}>
+                    <td>{idx + 1}</td>
+                    <td>{p.product_name}</td>
+                    <td>{p.quantity}</td>
+                    <td>₹{p.cost_price}</td>
+                    <td>₹{p.total_cost}</td>
+                    <td>
+                      <button
+                        style={{
+                          border: "none",
+                          background: "transparent",
+                          color: "red",
+                          cursor: "pointer",
+                        }}
+                        onClick={() => removeFromCart(idx)}
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan="4" style={{ textAlign: "right", fontWeight: "bold" }}>
+                    Grand Total:
+                  </td>
+                  <td colSpan="2" style={{ fontWeight: "bold" }}>
+                    ₹{invoiceTotal.toFixed(2)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "1rem" }}>
+            <button className="btn" onClick={savePurchase}>
+              Save Purchase
             </button>
           </div>
         </div>
@@ -183,89 +263,3 @@ export default function PurchaseList() {
     </div>
   );
 }
-
-/* ---------- Inline Styles ---------- */
-const styles = {
-  purchaseContainer: {
-    padding: "1.5rem",
-    maxWidth: "100%",
-  },
-  topActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    marginBottom: "1rem",
-  },
-  card: {
-    background: "#fff",
-    borderRadius: "10px",
-    padding: "1rem",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-  },
-  btn: {
-    background: "#22c55e",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "0.5rem 1rem",
-    cursor: "pointer",
-    fontWeight: "500",
-    transition: "0.3s",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-    fontSize: "0.95rem",
-  },
-  noData: {
-    textAlign: "center",
-    padding: "1rem",
-  },
-  modalForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-  },
-  formRow: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "1rem",
-  },
-  input: {
-    flex: 1,
-    minWidth: "150px",
-    padding: "0.6rem",
-    border: "1px solid #d1d5db",
-    borderRadius: "6px",
-    fontSize: "0.9rem",
-  },
-  formFooter: {
-    display: "flex",
-    justifyContent: "flex-end",
-  },
-};
-
-/* ---------- Responsive Media Queries ---------- */
-const styleSheet = document.createElement("style");
-styleSheet.innerHTML = `
-@media (max-width: 768px) {
-  table th, table td {
-    font-size: 0.85rem !important;
-    padding: 0.5rem !important;
-  }
-  button {
-    width: 100% !important;
-  }
-  .modal-form .form-row {
-    flex-direction: column !important;
-  }
-}
-@media (max-width: 480px) {
-  .purchase-container {
-    padding: 0.75rem !important;
-  }
-  button {
-    font-size: 0.9rem !important;
-  }
-}
-`;
-document.head.appendChild(styleSheet);
